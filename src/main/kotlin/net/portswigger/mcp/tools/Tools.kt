@@ -9,6 +9,7 @@ import burp.api.montoya.http.HttpMode
 import burp.api.montoya.http.HttpService
 import burp.api.montoya.http.message.HttpHeader
 import burp.api.montoya.http.message.requests.HttpRequest
+import burp.api.montoya.sitemap.SiteMapFilter
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -321,6 +322,29 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
             .map { encodeHistoryItem(it.toSerializableForm()) }
     }
 
+    mcpPaginatedTool<GetSiteMap>("Displays items within Burp's site map") {
+        val allowed = runBlocking {
+            checkDataAccessOrDeny(DataAccessType.HTTP_HISTORY, config, api, "site map")
+        }
+        if (!allowed) {
+            return@mcpPaginatedTool sequenceOf("Site map access denied by Burp Suite")
+        }
+
+        api.siteMap().requestResponses().asSequence().map { encodeHistoryItem(it.toSerializableForm()) }
+    }
+
+    mcpPaginatedTool<GetSiteMapPrefix>("Displays items within Burp's site map matching a URL prefix") {
+        val allowed = runBlocking {
+            checkDataAccessOrDeny(DataAccessType.HTTP_HISTORY, config, api, "site map")
+        }
+        if (!allowed) {
+            return@mcpPaginatedTool sequenceOf("Site map access denied by Burp Suite")
+        }
+
+        api.siteMap().requestResponses(SiteMapFilter.prefixFilter(prefix)).asSequence()
+            .map { encodeHistoryItem(it.toSerializableForm()) }
+    }
+
     mcpPaginatedTool<GetOrganizerItems>("Displays items within the Organizer tab") {
         val allowed = runBlocking {
             checkDataAccessOrDeny(DataAccessType.ORGANIZER, config, api, "Organizer")
@@ -511,6 +535,12 @@ data class GetProxyHttpHistory(override val count: Int, override val offset: Int
 
 @Serializable
 data class GetProxyHttpHistoryRegex(val regex: String, override val count: Int, override val offset: Int) : Paginated
+
+@Serializable
+data class GetSiteMap(override val count: Int, override val offset: Int) : Paginated
+
+@Serializable
+data class GetSiteMapPrefix(val prefix: String, override val count: Int, override val offset: Int) : Paginated
 
 @Serializable
 data class GetOrganizerItems(override val count: Int, override val offset: Int) : Paginated
